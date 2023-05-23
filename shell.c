@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <fcntl.h>
 #define LSH_TOK_DELIM " \t\r\n\a"
 #define LSH_TOK_BUFSIZE 64
 #define LSH_RL_BUFSIZE 1024
@@ -18,7 +18,7 @@ int lsh_exit(char **args);
 int lsh_execute(char **args);
 int lsh_pwd(char **args);
 int lsh_cat(char **args);
-
+int lsh_cp(char **args);
 int main(int argc, char **argv)
 {
   // Load config files, if any.
@@ -123,7 +123,8 @@ char *builtin_str[] = {
   "help",
   "exit",
   "pwd",
-  "cat"
+  "cat",
+  "cp"
 };
 
 int (*builtin_func[]) (char **) = {
@@ -131,7 +132,8 @@ int (*builtin_func[]) (char **) = {
   &lsh_help,
   &lsh_exit,
   &lsh_pwd,
-  &lsh_cat
+  &lsh_cat,
+  &lsh_cp
 };
 
 int lsh_num_builtins() {
@@ -152,25 +154,43 @@ int lsh_cd(char **args)
   }
   return 1;
 }
+int lsh_cp(char** args){
+	char buffer[1024];
+	int files[2];
+	ssize_t count;
+
+	files[0] = open(args[1],O_RDONLY);
+	if (files[0] == -1)
+		return -1;
+	files[1] = open(args[2], O_WRONLY | O_CREAT | S_IRUSR | S_IWUSR);
+	if (files[1] == -1){
+		close(files[0]);
+		return -1;
+	}
+while ((count = read(files[0], buffer, sizeof(buffer))) != 0)
+	write(files[1], buffer, count);
+return 1;
+
+}
 
 int lsh_cat(char** args)
 {
-   FILE *fp;
-   int bufferSize =  4096;
-   char buffer[bufferSize];
-	  
-   fp = fopen(args[1], "rb");
-   if (fp = NULL){
-	fprintf(stderr," No such file or directory");
-	exit(1);
-   	}
-
-   while(fgets(buffer,bufferSize,fp)){
-	int length=strlen(buffer);
-	buffer[length-1] = '\0';
-	fprintf(stdout, "%s\n",buffer);
+	FILE *fp;
+	const int bufferSize = 4096;
+	char buffer[bufferSize];
+	
+	fp= fopen(args[1], "rb");
+	if (fp == NULL){
+		fprintf(stderr,"%s %s: No such file or directory",
+			args[0], args[1]);
+		exit(1);
 	}
-   return 0;
+	while (fgets(buffer, bufferSize, (fp == NULL ? stdin : fp))){
+		int length = strlen(buffer);
+		buffer[length - 1] = '\0';
+		fprintf(stdout, "%s\n", buffer);
+}
+return 1;
 }
 int lsh_pwd(char **args){
    printf("my pwd");
